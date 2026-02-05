@@ -1,0 +1,121 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { FileText } from 'lucide-react';
+
+const statusStyles = {
+  paid: 'bg-success/10 text-success border-success/20',
+  sent: 'bg-accent/10 text-accent border-accent/20',
+  draft: 'bg-muted text-muted-foreground border-muted',
+  overdue: 'bg-destructive/10 text-destructive border-destructive/20',
+};
+
+interface RecentInvoice {
+  id: string;
+  invoice_number: string;
+  total: number;
+  status: string;
+  customer_name: string | null;
+}
+
+export function RecentInvoices() {
+  const [invoices, setInvoices] = useState<RecentInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRecentInvoices = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('invoices')
+          .select(`
+            id,
+            invoice_number,
+            total,
+            status,
+            customers(name)
+          `)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (error) throw error;
+
+        setInvoices(data?.map(inv => ({
+          id: inv.id,
+          invoice_number: inv.invoice_number,
+          total: Number(inv.total),
+          status: inv.status,
+          customer_name: inv.customers?.name || null,
+        })) || []);
+      } catch (error) {
+        console.error('Error fetching recent invoices:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecentInvoices();
+  }, []);
+
+  return (
+    <div className="rounded-xl bg-card p-6 shadow-card">
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-card-foreground">Recent Invoices</h3>
+          <p className="text-sm text-muted-foreground">Latest transactions</p>
+        </div>
+        <a href="/invoices" className="text-sm font-medium text-accent hover:underline">
+          View all
+        </a>
+      </div>
+      
+      {loading ? (
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 rounded-lg bg-muted animate-pulse" />
+          ))}
+        </div>
+      ) : invoices.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-4">
+            <FileText className="h-6 w-6 text-muted-foreground" />
+          </div>
+          <p className="text-muted-foreground">No invoices yet</p>
+          <p className="text-sm text-muted-foreground">Create your first invoice to see it here</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {invoices.map((invoice) => (
+            <div
+              key={invoice.id}
+              className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-muted/30"
+            >
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  <span className="text-sm font-semibold text-primary">
+                    {invoice.customer_name?.charAt(0) || '?'}
+                  </span>
+                </div>
+                <div>
+                  <p className="font-medium text-card-foreground">{invoice.customer_name || 'Unknown'}</p>
+                  <p className="text-sm text-muted-foreground">{invoice.invoice_number}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold text-card-foreground">
+                  €{invoice.total.toLocaleString()}
+                </p>
+                <Badge 
+                  variant="outline" 
+                  className={cn('mt-1 capitalize', statusStyles[invoice.status as keyof typeof statusStyles] || statusStyles.draft)}
+                >
+                  {invoice.status}
+                </Badge>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,2 @@
+-- Add discount column to invoices table
+ALTER TABLE public.invoices ADD COLUMN discount numeric NOT NULL DEFAULT 0;
