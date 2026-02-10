@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { FileText } from 'lucide-react';
+import { FileText, ArrowUpRight, ArrowDownLeft, ShoppingCart, DollarSign } from 'lucide-react';
 
 const statusStyles = {
   paid: 'bg-success/10 text-success border-success/20',
@@ -17,6 +17,8 @@ interface RecentInvoice {
   total: number;
   status: string;
   customer_name: string | null;
+  seller_name: string | null;
+  invoice_type: 'sales' | 'purchase';
 }
 
 export function RecentInvoices() {
@@ -33,7 +35,9 @@ export function RecentInvoices() {
             invoice_number,
             total,
             status,
-            customers(name)
+            invoice_type,
+            customers(name),
+            sellers(name, company_name)
           `)
           .order('created_at', { ascending: false })
           .limit(5);
@@ -45,7 +49,9 @@ export function RecentInvoices() {
           invoice_number: inv.invoice_number,
           total: Number(inv.total),
           status: inv.status,
+          invoice_type: inv.invoice_type as 'sales' | 'purchase',
           customer_name: inv.customers?.name || null,
+          seller_name: inv.sellers?.company_name || inv.sellers?.name || null,
         })) || []);
       } catch (error) {
         console.error('Error fetching recent invoices:', error);
@@ -68,7 +74,7 @@ export function RecentInvoices() {
           View all
         </a>
       </div>
-      
+
       {loading ? (
         <div className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -85,35 +91,49 @@ export function RecentInvoices() {
         </div>
       ) : (
         <div className="space-y-4">
-          {invoices.map((invoice) => (
-            <div
-              key={invoice.id}
-              className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-muted/30"
-            >
-              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="text-sm font-semibold text-primary">
-                    {invoice.customer_name?.charAt(0) || '?'}
-                  </span>
+          {invoices.map((invoice) => {
+            const isPurchase = invoice.invoice_type === 'purchase';
+            const name = isPurchase ? invoice.seller_name || 'Unknown Seller' : invoice.customer_name || 'Unknown Customer';
+            const iconBg = isPurchase ? 'bg-destructive/10' : 'bg-success/10';
+            const iconColor = isPurchase ? 'text-destructive' : 'text-success';
+
+            return (
+              <div
+                key={invoice.id}
+                className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-muted/30"
+              >
+                <div className="flex items-center gap-4">
+                  <div className={cn("h-10 w-10 rounded-full flex items-center justify-center", iconBg)}>
+                    {isPurchase ? (
+                      <ShoppingCart className={cn("h-5 w-5", iconColor)} />
+                    ) : (
+                      <DollarSign className={cn("h-5 w-5", iconColor)} />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-card-foreground">{name}</p>
+                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5">
+                        {isPurchase ? 'Purchase' : 'Sale'}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground">{invoice.invoice_number}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-card-foreground">{invoice.customer_name || 'Unknown'}</p>
-                  <p className="text-sm text-muted-foreground">{invoice.invoice_number}</p>
+                <div className="text-right">
+                  <p className={cn("font-semibold", isPurchase ? "text-destructive" : "text-success")}>
+                    {isPurchase ? '-' : '+'}€{invoice.total.toLocaleString()}
+                  </p>
+                  <Badge
+                    variant="outline"
+                    className={cn('mt-1 capitalize', statusStyles[invoice.status as keyof typeof statusStyles] || statusStyles.draft)}
+                  >
+                    {invoice.status}
+                  </Badge>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-semibold text-card-foreground">
-                  €{invoice.total.toLocaleString()}
-                </p>
-                <Badge 
-                  variant="outline" 
-                  className={cn('mt-1 capitalize', statusStyles[invoice.status as keyof typeof statusStyles] || statusStyles.draft)}
-                >
-                  {invoice.status}
-                </Badge>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

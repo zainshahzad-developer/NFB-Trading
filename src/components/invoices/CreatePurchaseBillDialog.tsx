@@ -109,6 +109,19 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
         return items.reduce((sum, item) => sum + item.lineTotal, 0);
     };
 
+    const clearAll = () => {
+        setItems([]);
+        setInvoiceNumber('');
+        setSellerId('');
+        resetItemInputs();
+    };
+
+    const resetItemInputs = () => {
+        setSelectedProductId('');
+        setQuantity('1');
+        setBuyingPriceOriginal('');
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (items.length === 0) {
@@ -138,15 +151,15 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
             onSuccess?.();
 
             // Reset form
-            setInvoiceNumber('');
-            setItems([]);
-            setSellerId('');
+            clearAll();
         } catch (error) {
             console.error('Error creating purchase bill:', error);
         } finally {
             setIsSubmitting(false);
         }
     };
+
+    const isItemValid = selectedProductId && quantity && buyingPriceOriginal;
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -275,7 +288,12 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                             </div>
 
                             <div className="col-span-2">
-                                <Button type="button" onClick={addItem} className="w-full">
+                                <Button
+                                    type="button"
+                                    onClick={addItem}
+                                    className="w-full"
+                                    disabled={!isItemValid}
+                                >
                                     <Plus className="h-4 w-4" /> Add
                                 </Button>
                             </div>
@@ -343,13 +361,20 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                         </div>
                     )}
 
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={isSubmitting} className="btn-primary-gradient">
-                            {isSubmitting ? 'Creating...' : 'Create Purchase Bill'}
-                        </Button>
+                    <DialogFooter className="flex justify-between sm:justify-between">
+                        <div className="flex gap-2">
+                            <Button type="button" variant="ghost" onClick={clearAll} className="text-muted-foreground hover:text-destructive">
+                                Clear All
+                            </Button>
+                        </div>
+                        <div className="flex gap-2">
+                            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={isSubmitting || items.length === 0} className="btn-primary-gradient">
+                                {isSubmitting ? 'Creating...' : 'Create Purchase Bill'}
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </form>
             </DialogContent>
