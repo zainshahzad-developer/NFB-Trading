@@ -16,12 +16,16 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Determine basename based on deployment environment
+// GitHub Pages uses /NFB-Trading/, local dev uses /
+const basename = import.meta.env.MODE === 'production' ? '/NFB-Trading' : '/';
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter basename="/NFB-Trading">
+      <BrowserRouter basename={basename}>
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/stock" element={<Stock />} />

@@ -42,9 +42,10 @@ export function useInvoices() {
             unitPrice: Number(item.unit_price),
             lineTotal: Number(item.line_total),
             buyingRate: item.buying_rate ? Number(item.buying_rate) : undefined,
-            buyingCurrency: item.buying_currency || undefined,
-            exchangeRate: item.exchange_rate ? Number(item.exchange_rate) : undefined,
-            buyingPriceOriginal: item.buying_price_original ? Number(item.buying_price_original) : undefined,
+            // TODO: Uncomment after migration
+            // buyingCurrency: item.buying_currency || undefined,
+            // exchangeRate: item.exchange_rate ? Number(item.exchange_rate) : undefined,
+            // buyingPriceOriginal: item.buying_price_original ? Number(item.buying_price_original) : undefined,
           }));
 
           return {
@@ -148,24 +149,45 @@ export function useInvoices() {
       if (invoiceError) throw invoiceError;
 
       // Insert invoice items
-      const itemsToInsert = invoice.items.map(item => ({
-        invoice_id: invoiceData.id,
-        product_id: item.productId || null,
-        product_name: item.productName,
-        specs: item.specs || null,
-        color: item.color || null,
-        quantity: item.quantity,
-        unit_price: item.unitPrice,
-        line_total: item.lineTotal,
-        buying_rate: item.buyingRate ?? null,
-        buying_currency: item.buyingCurrency ?? null,
-        exchange_rate: item.exchangeRate ?? null,
-        buying_price_original: item.buyingPriceOriginal ?? null,
-      }));
+      const itemsToInsert = invoice.items.map(item => {
+        const baseItem: Record<string, unknown> = {
+          invoice_id: invoiceData.id,
+          product_id: item.productId || null,
+          product_name: item.productName,
+          specs: item.specs || null,
+          color: item.color || null,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          line_total: item.lineTotal,
+        };
+
+        // TODO: Re-enable these fields once the database migration is applied
+        // The following columns need to exist in invoice_items table:
+        // - buying_currency (text)
+        // - exchange_rate (numeric)
+        // - buying_price_original (numeric)
+        // - buying_rate (numeric) - this one already exists
+        //
+        // Uncomment the following lines after running the migration:
+        // if (item.buyingRate !== undefined && item.buyingRate !== null) {
+        //   baseItem.buying_rate = item.buyingRate;
+        // }
+        // if (item.buyingCurrency) {
+        //   baseItem.buying_currency = item.buyingCurrency;
+        // }
+        // if (item.exchangeRate !== undefined && item.exchangeRate !== null) {
+        //   baseItem.exchange_rate = item.exchangeRate;
+        // }
+        // if (item.buyingPriceOriginal !== undefined && item.buyingPriceOriginal !== null) {
+        //   baseItem.buying_price_original = item.buyingPriceOriginal;
+        // }
+
+        return baseItem;
+      });
 
       const { error: itemsError } = await supabase
         .from('invoice_items')
-        .insert(itemsToInsert);
+        .insert(itemsToInsert as any);
 
       if (itemsError) throw itemsError;
 
@@ -258,24 +280,27 @@ export function useInvoices() {
 
       // Insert new invoice items
       if (updates.items && updates.items.length > 0) {
-        const itemsToInsert = updates.items.map(item => ({
-          invoice_id: id,
-          product_id: item.productId || null,
-          product_name: item.productName,
-          specs: item.specs || null,
-          color: item.color || null,
-          quantity: item.quantity,
-          unit_price: item.unitPrice,
-          line_total: item.lineTotal,
-          buying_rate: item.buyingRate ?? null,
-          buying_currency: item.buyingCurrency ?? null,
-          exchange_rate: item.exchangeRate ?? null,
-          buying_price_original: item.buyingPriceOriginal ?? null,
-        }));
+        const itemsToInsert = updates.items.map(item => {
+          const baseItem: Record<string, unknown> = {
+            invoice_id: id,
+            product_id: item.productId || null,
+            product_name: item.productName,
+            specs: item.specs || null,
+            color: item.color || null,
+            quantity: item.quantity,
+            unit_price: item.unitPrice,
+            line_total: item.lineTotal,
+          };
+
+          // TODO: Re-enable currency fields after database migration
+          // (Same as in createInvoice function)
+
+          return baseItem;
+        });
 
         const { error: itemsError } = await supabase
           .from('invoice_items')
-          .insert(itemsToInsert);
+          .insert(itemsToInsert as any);
 
         if (itemsError) throw itemsError;
       }

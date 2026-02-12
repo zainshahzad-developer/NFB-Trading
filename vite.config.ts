@@ -9,7 +9,8 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
-  base: "/NFB-Trading/",
+  // Use root base path for dev/preview, GitHub Pages path for production
+  base: mode === "production" ? "/NFB-Trading/" : "/",
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: {
