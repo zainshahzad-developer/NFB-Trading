@@ -1,4 +1,3 @@
-
 import { useState, useMemo } from 'react';
 import {
     Dialog,
@@ -18,6 +17,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { InvoiceItem } from '@/types';
 import { useProducts } from '@/hooks/useProducts';
 import { useSellers } from '@/hooks/useSellers';
@@ -51,6 +51,8 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
     const [items, setItems] = useState<InvoiceItem[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [sellerId, setSellerId] = useState('');
+    const [stockType, setStockType] = useState<'stock' | 'presale'>('stock');
+    const [productSearch, setProductSearch] = useState('');
 
     // Item Input State
     const [selectedProductId, setSelectedProductId] = useState('');
@@ -69,6 +71,17 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
         // So Price(EUR) = Price(Original) * Rate.
         return price * rate;
     }, [buyingPriceOriginal, buyingRate]);
+
+    // Filter products based on search
+    const filteredProducts = useMemo(() => {
+        if (!productSearch) return products;
+        const search = productSearch.toLowerCase();
+        return products.filter(p =>
+            p.name.toLowerCase().includes(search) ||
+            p.specs?.toLowerCase().includes(search) ||
+            p.color?.toLowerCase().includes(search)
+        );
+    }, [products, productSearch]);
 
     const addItem = () => {
         const product = products.find(p => p.id === selectedProductId);
@@ -131,6 +144,9 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
 
         setIsSubmitting(true);
         try {
+            // Only adjust stock if stock type is 'stock', not 'presale'
+            const shouldAdjustStock = stockType === 'stock' ? adjustStock : undefined;
+
             await createInvoice({
                 invoiceNumber: invoiceNumber.trim() || `PB-${Date.now()}`,
                 invoiceType: 'purchase',
@@ -144,7 +160,8 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                 total: calculateTotal(),
                 status: 'draft',
                 dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-            }, adjustStock);
+                notes: stockType === 'presale' ? 'Presale - Stock not adjusted' : undefined,
+            }, shouldAdjustStock);
 
             toast.success('Purchase bill created successfully');
             onOpenChange(false);
@@ -181,7 +198,7 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                 <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <Label htmlFor="invoiceNumber">Bill Number</Label>
+                            <Label htmlFor="invoiceNumber">Bill Number (Optional)</Label>
                             <Input
                                 id="invoiceNumber"
                                 value={invoiceNumber}
@@ -190,8 +207,25 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                                 className="mt-1.5"
                             />
                         </div>
+
                         <div>
-                            <Label htmlFor="seller">Seller (Optional)</Label>
+                            <Label>Stock Type</Label>
+                            <RadioGroup value={stockType} onValueChange={(value) => setStockType(value as 'stock' | 'presale')} className="flex gap-4 mt-2">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="stock" id="stock" />
+                                    <Label htmlFor="stock" className="font-normal cursor-pointer">Add to Stock</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="presale" id="presale" />
+                                    <Label htmlFor="presale" className="font-normal cursor-pointer">Presale</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label>Seller (Optional)</Label>
                             <Select value={sellerId} onValueChange={setSellerId}>
                                 <SelectTrigger className="mt-1.5">
                                     <SelectValue placeholder="Select who we bought from" />
@@ -209,6 +243,17 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
 
                     <div className="p-4 border rounded-lg bg-card space-y-4">
                         <h3 className="font-semibold text-sm mb-2">Add Items</h3>
+
+                        {/* Product Search */}
+                        <div className="col-span-full">
+                            <Input
+                                placeholder="Search products by name, specs, or color..."
+                                value={productSearch}
+                                onChange={(e) => setProductSearch(e.target.value)}
+                                className="w-full"
+                            />
+                        </div>
+
                         <div className="grid grid-cols-12 gap-3 items-end">
                             <div className="col-span-3">
                                 <Label className="text-xs">Product</Label>
@@ -217,7 +262,7 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                                         <SelectValue placeholder="Select Product" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {products.map((product) => (
+                                        {filteredProducts.map((product) => (
                                             <SelectItem key={product.id} value={product.id}>
                                                 {product.name}
                                             </SelectItem>

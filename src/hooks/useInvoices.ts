@@ -117,7 +117,7 @@ export function useInvoices() {
 
   const createInvoice = async (
     invoice: Omit<Invoice, 'id' | 'createdAt'>,
-    adjustStockFn: (productId: string, quantity: number) => Promise<void>
+    adjustStockFn?: (productId: string, quantity: number) => Promise<void>
   ) => {
     try {
       // First, validate stock for all items
@@ -194,10 +194,12 @@ export function useInvoices() {
       // Adjust stock for each item based on invoice type
       // Sales invoice: deduct stock (negative)
       // Purchase invoice: add stock (positive)
-      for (const item of invoice.items) {
-        if (item.productId) {
-          const stockChange = invoice.invoiceType === 'purchase' ? item.quantity : -item.quantity;
-          await adjustStockFn(item.productId, stockChange);
+      if (adjustStockFn) {
+        for (const item of invoice.items) {
+          if (item.productId) {
+            const stockChange = invoice.invoiceType === 'purchase' ? item.quantity : -item.quantity;
+            await adjustStockFn(item.productId, stockChange);
+          }
         }
       }
 
