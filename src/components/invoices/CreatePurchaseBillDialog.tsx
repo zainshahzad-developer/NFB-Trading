@@ -160,7 +160,6 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                 total: calculateTotal(),
                 status: 'draft',
                 dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-                notes: stockType === 'presale' ? 'Presale - Stock not adjusted' : undefined,
             }, shouldAdjustStock);
 
             toast.success('Purchase bill created successfully');
@@ -262,9 +261,19 @@ export function CreatePurchaseBillDialog({ open, onOpenChange, onSuccess }: Crea
                                         <SelectValue placeholder="Select Product" />
                                     </SelectTrigger>
                                     <SelectContent>
+                                        {filteredProducts.length === 0 && (
+                                            <div className="px-2 py-3 text-sm text-muted-foreground text-center">No products found</div>
+                                        )}
                                         {filteredProducts.map((product) => (
                                             <SelectItem key={product.id} value={product.id}>
-                                                {product.name}
+                                                <div className="flex flex-col gap-0.5">
+                                                    <span className="font-medium">{product.name}</span>
+                                                    {(product.specs || product.color) && (
+                                                        <span className="text-xs text-muted-foreground">
+                                                            {[product.specs, product.color].filter(Boolean).join(' · ')}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             </SelectItem>
                                         ))}
                                     </SelectContent>

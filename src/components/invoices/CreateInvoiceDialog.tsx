@@ -43,7 +43,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
   const { createInvoice } = useInvoices();
   const { bankAccounts, refetch: refetchBankAccounts } = useBankAccounts();
   const { getCurrencySymbol, convert, formatCurrency } = useCurrencyConverter();
-  
+
   const [invoiceType, setInvoiceType] = useState<'sales' | 'purchase'>('sales');
   const [template, setTemplate] = useState<'nfb-trading' | 'teletek' | 'jsp' | 'packing-nfb' | 'purchase-stock' | 'purchase-presale' | 'purchase-nfb' | 'purchase-teletek' | 'purchase-jsp'>('nfb-trading');
   const [purchaseSource, setPurchaseSource] = useState<'stock' | 'pre-sale'>('stock');
@@ -57,6 +57,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
   const [discount, setDiscount] = useState('0');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState('');
+  const [productSearch, setProductSearch] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [buyingRate, setBuyingRate] = useState('');
   const [editingItemIndex, setEditingItemIndex] = useState<number | null>(null);
@@ -64,7 +65,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
   const [editBuyingRate, setEditBuyingRate] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currency, setCurrency] = useState('EUR');
-  
+
   // Quick Purchase Dialog state
   const [quickPurchaseOpen, setQuickPurchaseOpen] = useState(false);
   const [quickPurchaseProduct, setQuickPurchaseProduct] = useState<Product | null>(null);
@@ -78,6 +79,17 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
     });
     return pending;
   }, [items]);
+
+  // Filter products by search input
+  const filteredProducts = useMemo(() => {
+    if (!productSearch.trim()) return products;
+    const q = productSearch.toLowerCase();
+    return products.filter(p =>
+      p.name.toLowerCase().includes(q) ||
+      p.specs?.toLowerCase().includes(q) ||
+      p.color?.toLowerCase().includes(q)
+    );
+  }, [products, productSearch]);
 
   // Get effective available stock (stock - pending for sales, unlimited for purchase)
   const getEffectiveStock = (productId: string): number => {
@@ -169,13 +181,13 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
   // Handle successful quick purchase - refresh products and optionally auto-add item
   const handleQuickPurchaseSuccess = async (productId: string, addedQuantity: number) => {
     await refetchProducts();
-    
+
     // Auto-add the item to the invoice after successful purchase
     const product = products.find(p => p.id === productId);
     if (product && invoiceType === 'sales') {
       // Check if product already exists in items
       const existingItemIndex = items.findIndex(item => item.productId === productId);
-      
+
       if (existingItemIndex >= 0) {
         // Update existing item - add the suggested quantity that was needed
         const existingItem = items[existingItemIndex];
@@ -206,7 +218,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
         setItems([...items, newItem]);
         toast.success(`Added ${quickPurchaseSuggestedQty}x ${product.name} to invoice`);
       }
-      
+
       // Clear the selection
       setSelectedProductId('');
       setQuantity('1');
@@ -218,7 +230,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
     if (!product) return;
 
     const qty = parseInt(quantity) || 1;
-    
+
     // For sales invoices, validate stock
     if (invoiceType === 'sales') {
       const effectiveStock = getEffectiveStock(selectedProductId);
@@ -239,12 +251,12 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
 
     // Check if product already exists in items
     const existingItemIndex = items.findIndex(item => item.productId === product.id);
-    
+
     if (existingItemIndex >= 0) {
       // Update existing item quantity
       const existingItem = items[existingItemIndex];
       const newQty = existingItem.quantity + qty;
-      
+
       // Revalidate with new total for sales invoices
       if (invoiceType === 'sales' && newQty > getAvailableStock(selectedProductId)) {
         const available = getAvailableStock(selectedProductId);
@@ -321,7 +333,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
 
   const updateQuantity = (index: number, newQty: number) => {
     const item = items[index];
-    
+
     // For sales invoices, validate stock
     if (invoiceType === 'sales') {
       const availableStock = getAvailableStock(item.productId);
@@ -370,20 +382,20 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (invoiceType === 'sales' && stockIssues.length > 0) {
       toast.error('Cannot create invoice: Insufficient stock for some items');
       return;
     }
 
     setIsSubmitting(true);
-    
+
     try {
       const selectedSeller = sellers.find(s => s.id === sellerId);
       const selectedCustomer = customers.find(c => c.id === customerId);
-      
+
       const prefix = invoiceType === 'purchase' ? 'PO' : 'INV';
-      
+
       await createInvoice({
         invoiceNumber: invoiceNumber.trim() || `${prefix}-${Date.now()}`,
         invoiceType,
@@ -454,11 +466,10 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
                   // reset to a sensible default for sales
                   setTemplate('nfb-trading');
                 }}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  invoiceType === 'sales'
+                className={`p-4 rounded-xl border-2 transition-all text-left ${invoiceType === 'sales'
                     ? 'border-accent bg-accent/10'
                     : 'border-border hover:border-accent/50'
-                }`}
+                  }`}
               >
                 <p className="font-semibold text-card-foreground">Sales Invoice</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -473,11 +484,10 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
                   setSellerId('');
                   handlePurchaseSourceChange(purchaseSource);
                 }}
-                className={`p-4 rounded-xl border-2 transition-all text-left ${
-                  invoiceType === 'purchase'
+                className={`p-4 rounded-xl border-2 transition-all text-left ${invoiceType === 'purchase'
                     ? 'border-success bg-success/10'
                     : 'border-border hover:border-success/50'
-                }`}
+                  }`}
               >
                 <p className="font-semibold text-card-foreground">Purchase Invoice</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -566,14 +576,14 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
                   {template === 'nfb-trading' || template === 'packing-nfb' || template === 'purchase-nfb'
                     ? 'NFB Trading LTD'
                     : template === 'teletek' || template === 'purchase-teletek'
-                    ? 'TELETEK TECHNAHH BV'
-                    : template === 'jsp' || template === 'purchase-jsp'
-                    ? 'JASPELENDARIO UNIPESSOAL LDA'
-                    : template === 'purchase-stock'
-                    ? 'Purchase Order (Stock) - Generic'
-                    : template === 'purchase-presale'
-                    ? 'Purchase Order (Pre-Sale) - Generic'
-                    : 'Invoice Template'}
+                      ? 'TELETEK TECHNAHH BV'
+                      : template === 'jsp' || template === 'purchase-jsp'
+                        ? 'JASPELENDARIO UNIPESSOAL LDA'
+                        : template === 'purchase-stock'
+                          ? 'Purchase Order (Stock) - Generic'
+                          : template === 'purchase-presale'
+                            ? 'Purchase Order (Pre-Sale) - Generic'
+                            : 'Invoice Template'}
                   {invoiceType === 'purchase' && (
                     <span className="ml-2 text-xs font-normal text-muted-foreground">
                       ({purchaseSource === 'stock' ? 'Stock Intake' : 'Pre-Sale'})
@@ -584,27 +594,27 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
                   {template === 'nfb-trading'
                     ? 'Professional sales invoice format'
                     : template === 'packing-nfb'
-                    ? 'Packing invoice format (no prices)'
-                    : template === 'teletek'
-                    ? 'Marginal VAT scheme format'
-                    : template === 'jsp'
-                    ? 'Marginal VAT scheme format (Portuguese)'
-                    : template === 'purchase-nfb'
-                    ? 'NFB Trading purchase order format'
-                    : template === 'purchase-teletek'
-                    ? 'Teletek purchase order format'
-                    : template === 'purchase-jsp'
-                    ? 'JSP purchase order format'
-                    : template === 'purchase-stock'
-                    ? 'Generic stock intake template (Green)'
-                    : 'Generic pre-sale order template (Blue)'}
+                      ? 'Packing invoice format (no prices)'
+                      : template === 'teletek'
+                        ? 'Marginal VAT scheme format'
+                        : template === 'jsp'
+                          ? 'Marginal VAT scheme format (Portuguese)'
+                          : template === 'purchase-nfb'
+                            ? 'NFB Trading purchase order format'
+                            : template === 'purchase-teletek'
+                              ? 'Teletek purchase order format'
+                              : template === 'purchase-jsp'
+                                ? 'JSP purchase order format'
+                                : template === 'purchase-stock'
+                                  ? 'Generic stock intake template (Green)'
+                                  : 'Generic pre-sale order template (Blue)'}
                 </p>
                 {/* NFB template variant selector */}
                 {invoiceType === 'sales' && (template === 'nfb-trading' || template === 'packing-nfb') && (
                   <div className="mt-3 pt-3 border-t border-accent/20">
                     <Label className="text-xs">Invoice Type</Label>
-                    <Select 
-                      value={template} 
+                    <Select
+                      value={template}
                       onValueChange={(v) => setTemplate(v as 'nfb-trading' | 'packing-nfb')}
                     >
                       <SelectTrigger className="mt-1.5 h-8 text-xs">
@@ -752,31 +762,50 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
           {/* Add Items */}
           <div>
             <Label>Invoice Items</Label>
-            <div className="flex gap-2 mt-2">
+            {/* Product Search */}
+            <div className="mt-2 mb-2">
+              <Input
+                placeholder="Search products by name, specs, or color..."
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
+                className="input-focus"
+              />
+            </div>
+            <div className="flex gap-2">
               <Select value={selectedProductId} onValueChange={setSelectedProductId}>
                 <SelectTrigger className="flex-1 input-focus">
                   <SelectValue placeholder="Select product" />
                 </SelectTrigger>
                 <SelectContent>
-                  {products.map((product) => {
+                  {filteredProducts.length === 0 && (
+                    <div className="px-2 py-3 text-sm text-muted-foreground text-center">No products found</div>
+                  )}
+                  {filteredProducts.map((product) => {
                     const currentStock = getAvailableStock(product.id);
                     const effectiveStock = getEffectiveStock(product.id);
                     // For purchase, no stock limit; for sales, check effective stock
                     const isOutOfStock = invoiceType === 'sales' && effectiveStock <= 0;
                     return (
-                      <SelectItem 
-                        key={product.id} 
+                      <SelectItem
+                        key={product.id}
                         value={product.id}
                         className={isOutOfStock ? 'opacity-60' : ''}
                       >
-                        <div className="flex items-center justify-between w-full gap-2">
-                          <span>{product.name} - {product.color}</span>
-                          <Badge 
-                            variant={isOutOfStock ? 'destructive' : currentStock <= product.minStock ? 'secondary' : 'outline'}
-                            className="text-xs ml-2"
-                          >
-                            {isOutOfStock ? 'Out of stock' : `${currentStock} in stock`}
-                          </Badge>
+                        <div className="flex flex-col w-full gap-0.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{product.name}</span>
+                            <Badge
+                              variant={isOutOfStock ? 'destructive' : currentStock <= product.minStock ? 'secondary' : 'outline'}
+                              className="text-xs ml-2 shrink-0"
+                            >
+                              {isOutOfStock ? 'Out of stock' : `${currentStock} in stock`}
+                            </Badge>
+                          </div>
+                          {(product.specs || product.color) && (
+                            <span className="text-xs text-muted-foreground">
+                              {[product.specs, product.color].filter(Boolean).join(' · ')}
+                            </span>
+                          )}
                         </div>
                       </SelectItem>
                     );
@@ -803,9 +832,9 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
                   placeholder="Buy Rate €"
                 />
               )}
-              <Button 
-                type="button" 
-                variant="outline" 
+              <Button
+                type="button"
+                variant="outline"
                 onClick={addItem}
                 disabled={!selectedProductId || parseInt(quantity) < 1}
               >
@@ -815,13 +844,12 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
             {selectedProductId && invoiceType === 'sales' && (
               <div className="flex items-center gap-3 mt-2 p-2 rounded-lg bg-muted/30">
                 <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${
-                    getEffectiveStock(selectedProductId) <= 0 
-                      ? 'bg-destructive' 
-                      : getEffectiveStock(selectedProductId) <= 5 
-                        ? 'bg-warning' 
+                  <div className={`w-2 h-2 rounded-full ${getEffectiveStock(selectedProductId) <= 0
+                      ? 'bg-destructive'
+                      : getEffectiveStock(selectedProductId) <= 5
+                        ? 'bg-warning'
                         : 'bg-success'
-                  }`} />
+                    }`} />
                   <p className="text-sm text-muted-foreground">
                     <span className="font-medium text-foreground">{getEffectiveStock(selectedProductId)}</span> units available
                   </p>
@@ -895,7 +923,7 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
                                 value={item.buyingRate ?? ''}
                                 onChange={(e) => {
                                   const newRate = parseFloat(e.target.value) || undefined;
-                                  const updatedItems = items.map((itm, i) => 
+                                  const updatedItems = items.map((itm, i) =>
                                     i === index ? { ...itm, buyingRate: newRate } : itm
                                   );
                                   setItems(updatedItems);
@@ -1004,9 +1032,9 @@ export function CreateInvoiceDialog({ open, onOpenChange, onSuccess }: CreateInv
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              className={invoiceType === 'purchase' ? 'bg-success hover:bg-success/90' : 'btn-accent-gradient'} 
+            <Button
+              type="submit"
+              className={invoiceType === 'purchase' ? 'bg-success hover:bg-success/90' : 'btn-accent-gradient'}
               disabled={items.length === 0 || (invoiceType === 'sales' && stockIssues.length > 0) || isSubmitting}
             >
               {isSubmitting ? 'Creating...' : invoiceType === 'purchase' ? 'Create Purchase Invoice' : 'Create Sales Invoice'}
